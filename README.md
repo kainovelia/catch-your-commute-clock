@@ -25,12 +25,13 @@ https://github.com/user-attachments/assets/113cec41-e696-4e0c-a4b0-b98049d00a72
 - Fit the board headers into the breadboard
 - Wire the components as shown in the diagram below
 
+![Circuit Diagram3_bb](https://github.com/user-attachments/assets/c935cde3-3ccf-45eb-91db-c632e82af710)
 
 ## Arduino Program
 - Open the file 'commute_clock.ino'
 - Select port connected to wired board
 - Change the ssid and password to connect to your local WiFi network
-- Change other variables, such as MTA route and station ID
+- Change other variables, such as MTA route url and station ID
 - Click 'Upload'
 - Check Serial output in 'Serial Monitor' (most top-right icon)
 - Debug wire connections, as needed
@@ -38,13 +39,26 @@ https://github.com/user-attachments/assets/113cec41-e696-4e0c-a4b0-b98049d00a72
 ## Protocol Buffers for GTFS File, Compiled For Python
 - Install Python
 - Install PySerialTransfer
+  ```
+  pip install pyserial
+  ```
 - Install requests
-- Install 
+  ```
+  pip install requests
+  ```
+- Install latest release of protobuf following the instructions from [https://grpc.io/docs/protoc-installation/]
+  (Installing with package manager may not give the most up to date release -- you need protoc v3.19 or higher)
+- In the same folder as the python app, download the base gtfs-rt.proto file[https://github.com/google/transit/blob/master/gtfs-realtime/proto/gtfs-realtime.proto] and the MTA's version of gtfs-rt.proto[https://raw.githubusercontent.com/OneBusAway/onebusaway-gtfs-realtime-api/master/src/main/proto/com/google/transit/realtime/gtfs-realtime-NYCT.proto]
+- Compile both files with protoc
+  ```
+  protoc --python_out=. your_proto_file.proto
+  ```
+  'python_out=.' points to your current directory, so be sure to run it in there
 
 ## Enclosure Design
 - Open the provided STL files in Ultimaker Cura
 - Adjust the print settings and send the files over to a compatible 3D printer
 - Remove the 3D print and clean up the edges
 - Secure the wire connections between the hardware components (by soldering or heatshrink wrapping)
-- Add heatsets to the provided holes in each corner of Part 1 and the outside of Part 3
-- Attach the hardware components to the outer shell for Part 1. Depending on the type of component, you can glue or securely screw mount them into place.
+- Add heatsets to the provided holes in each corner of the main enclosure and the lid.
+- Attach the hardware components to the outer shell of the main enclosure. Depending on the type of component, you can glue or securely screw mount them into place.
