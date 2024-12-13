@@ -9,7 +9,7 @@
 
 // Network variables
 const char* ssid = "YOUR_SSID_HERE";
-const char* password = "YOUR_PASSWORD_HERE";
+const char* password = "YOUR_WIFI_PASSWORD_HERE";
 TFT_eSPI tft = TFT_eSPI();
 HTTPClient http;
 
@@ -26,27 +26,26 @@ int mode = 1;
 int lastMode = 1;
 int menuCursor = 1;
 String joystickDirection;
-int alarmMillis = 600000; // 10 mins
-bool alarmOn = false;
-bool flash = true;
+volatile bool alarmOn = false;
+volatile bool flash = true;
+volatile bool firstDraw = true;
+volatile bool alarmRedraw = false;
+int alarmText = 0;
+
 
 // Button variables
-#define BUTTON_TOP 13
-#define BUTTON_BOTTOM 15
+#define BUTTON_TOP 0
+#define BUTTON_BOTTOM 35
 #define X_PIN 36
 #define Y_PIN 37
 #define Z_PIN 38
 
-bool topButtonPressed = false;
-bool bottomButtonPressed = false;
-bool joystickMoved = false;
-
 // Train schedule variables
 String route = "Q";
 String direction = "DOWN";
-const int timeToStation = 10; //walk to station, in minutes
-bool firstGet = true;
-bool refresh = false;
+const int timeToStation = 10; //walking time, in mins
+volatile bool firstGet = true;
+volatile bool refresh = false;
 int nextArr;
 
 void setup() {
@@ -76,22 +75,38 @@ void setup() {
     Serial.println("WiFi not connected.");
   }
 
-  //Setting button input behavior
   pinMode(BUTTON_TOP, INPUT_PULLUP);
   pinMode(BUTTON_BOTTOM, INPUT_PULLUP);
   pinMode(Z_PIN, INPUT_PULLUP);
+  attachInterrupt(digitalPinToInterrupt(X_PIN), joystickMovedLeft, LOW);
+  attachInterrupt(digitalPinToInterrupt(X_PIN), joystickMovedRight, RISING);
+
 }
 
+void joystickMovedLeft() {
+  if(mode==0){
+    tft.fillScreen(TFT_BLUE);
+    menuCursor--;
+  }
+}
+
+void joystickMovedRight() {
+  if(mode==0){
+    tft.fillScreen(TFT_BLUE);
+    menuCursor++;
+  }
+}
 void loop() {  
 
   int topState = digitalRead(BUTTON_TOP);
   int bottomState = digitalRead(BUTTON_BOTTOM);
   int menuState = digitalRead(Z_PIN);
-  //For debugging Serial values
+
+  //For debugging serial values
   Serial.printf("%d, %d, %d", topState, bottomState, menuState);
 
-  // Logic to determine mode and which function to call
-  // Modes: 0 - menu, 1 - RT Clock, 2 - Next Train Sched, 3 - Commute Alarm
+  //Logic to determine mode and function call
+  //Modes: 0 - menu, 1 - RT Clock, 2 - Next Train Sched, 3 - Commute Alarm
   if(menuState==1){
     mode = 0;
   }
@@ -99,10 +114,12 @@ void loop() {
   if(topState==0) {
     if (mode == 0) {
       mode = menuCursor;
+      tft.fillScreen(TFT_BLUE);
     }
   } else if (bottomState==0) {
     if(mode == 0){
       mode == lastMode;
+      tft.fillScreen(TFT_BLUE);
     }
   }
   
@@ -159,10 +176,11 @@ void drawClock() {
     tft.drawString(curTime, 10, 10);
 }
 
-// Get GTFS realtime data to display next train of given stop
-// Both mode 2 and 3, only 3 has "alarm messages" depending on next arrival time
+// Get GTFS realtime data to display next train of given station
+// For mode 2 and 3, difference is 3 has "alarm messages" underneathe
 void getGTFS() {
   tft.fillScreen(TFT_BLUE);
+  int mins;
 
   if(refresh || firstGet){
     Serial.println("R");
@@ -179,7 +197,7 @@ void getGTFS() {
       int time = recvdString.toInt();
       nextArr = time;
       int diff = nextArr - nowTime;
-      int mins = diff / 60;
+      mins = diff / 60;
       String train_info1 = "<" + route + "> " + direction;
       String train_info2 = String(mins) + "mins";
       tft.setTextSize(2);
@@ -192,42 +210,73 @@ void getGTFS() {
   } else {
     int nowTime = rtc.getLocalEpoch();
     int diff = (nextArr - nowTime);
-    int mins = diff / 60;
+    mins = diff / 60;
     String train_info1 = "<" + route + "> " + direction;
     String train_info2 = String(mins) + "mins";
     tft.setTextSize(2);
     tft.drawString(train_info1, 10, 10);
     tft.drawString(train_info2, 10, 40);
-    if (alarmOn==true) {
+  }
+  
+  if (alarmOn==true) {
+    if(firstDraw || alarmRedraw) {
       if(mins > 10) {
         tft.drawString("You got time", 10, 70);
-      } else if(mins <= 10) {
-        tft.drawString("You better hurry...", 10, 70);
-      } else if(mins <= 6) {
+        alarmText = 1;
+      } else if (mins <= 10){
+        tft.drawString("Time to go...", 10, 70);
+        alarmText = 2;
+      } else if (mins <= 6) {
         if(flash){
-          flash = false,
           tft.setTextColor(TFT_RED, TFT_BLUE);
           tft.drawString("Run!!!", 10, 70);
+          flash = false;
+          alarmText = 3;
         } else {
-          flash = true,
-          tft.setTextColor(TFT_RED, TFT_BLUE);
+          tft.setTextColor(TFT_WHITE, TFT_BLUE);
           tft.drawString("Run!!!", 10, 70);
+          flash = true;
+          alarmText = 3;
         }
-      } else if(mins < 5) {
+      } else if (mins < 4) {
         tft.setTextColor(TFT_WHITE, TFT_BLUE);
         tft.drawString("Wait for the next one...", 10, 70);
+        alarmText = 4;
       }
-    } 
-    if(mins == 0){
-      refresh = true;
-      alarmOn = false;
+        firstDraw = false;
+        alarmRedraw = false;
+    } else if (alarmRedraw == false) {
+      if(mins > 10 && alarmText != 1) {
+        alarmRedraw = true;
+      } else if (mins <= 10 && alarmText != 2){
+        alarmRedraw = true;
+      } else if (mins <= 6 && alarmText != 3) {
+        if(flash){
+          tft.setTextColor(TFT_RED, TFT_BLUE);
+          tft.drawString("Run!!!", 10, 70);
+          flash = false;
+          alarmRedraw = true;
+        } else {
+          tft.setTextColor(TFT_WHITE, TFT_BLUE);
+          tft.drawString("Run!!!", 10, 70);
+          flash = true;
+          alarmRedraw = true;
+        }
+      } else if (mins < 4 && alarmText != 4) {
+        tft.setTextColor(TFT_WHITE, TFT_BLUE);
+        tft.drawString("Wait for the next one...", 10, 70);
+        alarmRedraw = true;
+      } 
     }
+  }
+  if(mins == 0){
+    refresh = true;
+    alarmOn = false;
   }
 }
 
 // Display menu options
 void menuMode() {
-  int xVal = analogRead(X_PIN);
   if(menuCursor == 0){
     menuCursor == 3;
   }
@@ -246,13 +295,4 @@ void menuMode() {
     tft.drawString("COMMUTE", 10, 10);
     tft.drawString("ALARM", 10, 70);
   } 
-
-  if (xVal < 100) {
-    tft.fillScreen(TFT_BLUE);
-    menuCursor--;
-  } else if (xVal > 4000) {
-    tft.fillScreen(TFT_BLUE);
-    menuCursor++;
-  }
 }
-
