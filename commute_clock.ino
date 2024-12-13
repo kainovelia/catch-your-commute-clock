@@ -8,8 +8,8 @@
 #include <ESP32Time.h>
 
 // Network variables
-const char* ssid = "Kibel";
-const char* password = "Stella@1";
+const char* ssid = "YOUR_SSID_HERE";
+const char* password = "YOUR_PASSWORD_HERE";
 TFT_eSPI tft = TFT_eSPI();
 HTTPClient http;
 
@@ -41,9 +41,10 @@ bool topButtonPressed = false;
 bool bottomButtonPressed = false;
 bool joystickMoved = false;
 
+// Train schedule variables
 String route = "Q";
 String direction = "DOWN";
-const int timeToStation = 10; //in minutes
+const int timeToStation = 10; //walk to station, in minutes
 bool firstGet = true;
 bool refresh = false;
 int nextArr;
@@ -53,8 +54,6 @@ void setup() {
 
   tft.init();
   tft.setRotation(1);
-  tft.fillScreen(TFT_BLACK);
-
   tft.fillScreen(TFT_BLUE);
   tft.setTextColor(TFT_WHITE, TFT_BLUE);
   tft.setTextFont(2);
@@ -68,15 +67,16 @@ void setup() {
 
   Serial.print("Connected to WiFi Network with IP Address: ");
   Serial.println(WiFi.localIP());
-  Serial.println(timeSet);
 
   if (WiFi.status() == WL_CONNECTED) {
     Serial.print("WiFi connected!");
+    //Initialize and setup RTC mode on startup
     drawClock();
   } else {
     Serial.println("WiFi not connected.");
   }
 
+  //Setting button input behavior
   pinMode(BUTTON_TOP, INPUT_PULLUP);
   pinMode(BUTTON_BOTTOM, INPUT_PULLUP);
   pinMode(Z_PIN, INPUT_PULLUP);
@@ -87,8 +87,11 @@ void loop() {
   int topState = digitalRead(BUTTON_TOP);
   int bottomState = digitalRead(BUTTON_BOTTOM);
   int menuState = digitalRead(Z_PIN);
+  //For debugging Serial values
   Serial.printf("%d, %d, %d", topState, bottomState, menuState);
 
+  // Logic to determine mode and which function to call
+  // Modes: 0 - menu, 1 - RT Clock, 2 - Next Train Sched, 3 - Commute Alarm
   if(menuState==1){
     mode = 0;
   }
@@ -122,6 +125,7 @@ void loop() {
   }
 }
 
+// For mode 1 - draw RT time to display
 void drawClock() {
   Serial.print("Time set: ");
   Serial.println(timeSet);
@@ -155,6 +159,8 @@ void drawClock() {
     tft.drawString(curTime, 10, 10);
 }
 
+// Get GTFS realtime data to display next train of given stop
+// Both mode 2 and 3, only 3 has "alarm messages" depending on next arrival time
 void getGTFS() {
   tft.fillScreen(TFT_BLUE);
 
@@ -219,6 +225,7 @@ void getGTFS() {
   }
 }
 
+// Display menu options
 void menuMode() {
   int xVal = analogRead(X_PIN);
   if(menuCursor == 0){
